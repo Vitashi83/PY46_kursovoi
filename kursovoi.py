@@ -1,18 +1,30 @@
-import requests, json, datetime
+import requests
+import json
+import datetime
+import logging
 from datetime import datetime
 from urllib.parse import urljoin
+
+date_log = datetime.now().strftime("%Y-%m-%d")
+logmode = 'INFO'
+if logmode == 'INFO':
+    logging.basicConfig(filename=date_log + "-log.txt", level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+else:
+    logging.basicConfig(filename=date_log + "-log.txt", level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s')
+
+logging.info("Начало работы!")
 
 
 class Photo:
     name = ''
 
-    def __init__(self, date, likes, sizes):
+    def __init__(self, date, likes, sizez):
         self.date = date
         self.likes = likes
-        self.sizes = sizes
-        self.size_type = sizes['type']
-        self.url = sizes['url']
-        self.maxsize = max(sizes['width'], sizes['height'])
+        self.sizes = sizez
+        self.size_type = sizez['type']
+        self.url = sizez['url']
+        self.maxsize = max(sizez['width'], sizez['height'])
 
     def __repr__(self):
         return f'date: {self.date}, likes: {self.likes}, size: {self.maxsize}, url: {self.url}'
@@ -80,15 +92,12 @@ class YaUploader:
                                                  headers={"Authorization": self.auth})
                                     .json().get('_embedded').get('items')) if p['type'] == 'dir']
 
-
     def create_folder(self, folder_name):
         resp = requests.put("https://cloud-api.yandex.net/v1/disk/resources",
                             params={"path": '/' + folder_name},
                             headers={"Authorization": self.auth})
-        print(f'Создание папки "{folder_name}" ответ сервера:' + str(resp.status_code))
+        logging.info(f'Создание папки "{folder_name}" ответ сервера:' + str(resp.status_code))
         return resp.ok
-
-
 
     def upload(self, uid, photos):
         upload_folder = self.check_folder_name(uid, self.get_folders())
@@ -101,23 +110,21 @@ class YaUploader:
                                                  "url": photo.url},
                                          headers={"Authorization": self.auth})
                 if response.status_code == 202:
-                    print(f'Фотография "{photo.name}" загружена!')
+                    logging.info(f'Фотография "{photo.name}" загружена!')
                     log_result.append({"file_name": photo.name, "size": photo.size_type})
                 else:
-                    print(f'Ошибка загрузки фотографии "{photo.name}": '
-                          f'{response.json().get("message")}. Status code: {response.status_code}')
+                    logging.error(f'Ошибка загрузки фотографии "{photo.name}": '
+                    f'{response.json().get("message")}. Status code: {response.status_code}')
             with open(f'{uid}_{datetime.now().strftime("%m_%d_%Y_%H_%M_%S")}_files.json', "w") as f:
                 json.dump(log_result, f, ensure_ascii=False, indent=2)
 
 
-def init():
+if __name__ == '__main__':
     ya_token = input('Введите YandexDisk token:')
     uid = input('Введите VK user id:')
     qty = input('Введите количество фотографий для загрузки: ')
     vk_api = VKUnloader()
-    ya_api: YaUploader = YaUploader(ya_token)
+    ya_api = YaUploader(ya_token)
     ya_api.upload(uid, vk_api.get_photos(uid, int(qty)))
 
-
-if __name__ == '__main__':
-    init()
+logging.info("Работа завершена!")
